@@ -1,36 +1,53 @@
 #include "raylib.h"
 #include "player.h"
-#include "block.h"
-
-// Global variables
+#include "camera.h"
 
 int screenWidth = 1024;
 int screenHeight = 768;
+Camera2D camera;
 Player player;
-Block blocks[4];
+ConvexPolygon convexPolygons[4];
+ConcavePolygon concavePolygons[1];
 
-void initializeGame();
-void drawDebugInfo();
+void InitializeGame();
+void DrawDebugInfo();
 
 int main(void)
 {
     InitWindow(screenWidth, screenHeight, "Titan Trials");
     SetTargetFPS(60);
 
-    initializeGame();
+    InitializeGame();
 
     while (!WindowShouldClose())
     {
-        ClearBackground(BLACK);
         float deltaTime = GetFrameTime();
 
-        updateBlocks(blocks, 4, deltaTime);
-        updatePlayer(&player, blocks, 4, deltaTime);
+        PlayerUpdate(&player, deltaTime);
+        CameraUpdate(&camera, &player, screenWidth, screenHeight);
+        
+        for (size_t i = 0; i < 2; i++)
+        {
+            PolygonRotateConvex(&convexPolygons[i], 0.05f);
+            PolygonHandleCollisionConvexConvex(&player.position.polygon, &convexPolygons[i]);
+        }
+
+        for (size_t i = 0; i < 1; i++)
+        {
+            PolygonRotateConcave(&concavePolygons[i], 0.01f);
+            PolygonHandleCollisionConcaveConvex(&concavePolygons[i], &player.position.polygon);
+        }
 
         BeginDrawing();
-            drawBlocks(blocks, 4);
-            drawPlayer(player);
-            drawDebugInfo();
+            ClearBackground(BLACK);
+        
+            BeginMode2D(camera);
+                PolygonDrawArrayConvex(convexPolygons, 2);
+                PolygonDrawArrayConcave(concavePolygons, 1);
+                PlayerDraw(&player);
+            EndMode2D();
+
+            DrawDebugInfo();
         EndDrawing();
     }
 
@@ -39,32 +56,36 @@ int main(void)
     return 0;
 }
 
-void initializeGame()
+void InitializeGame()
 {
     printf("INFO: Initializing game resources.\n");
 
-    player = initializePlayer(screenWidth / 2.0f, screenHeight / 2.0f, 32.0f, 64.0f);
+    player = PlayerInitialize(PolygonInitializeRectangle(0, 0, 32.0f, 32.0f, RED));
+    camera = CameraInitialize(&player, screenWidth, screenHeight);
 
-    Block floor = initializeBlock(0, screenHeight - 10.0f, screenWidth * 2.0f, 10.0f, RAYWHITE, 1.0f, true);
-    Block platform1 = initializeBlock(screenWidth / 2.0f - 160.0f, screenHeight - 74.0f, 64.0f, 64.0f, BLUE, 1.0f, true);
-    Block platform2 = initializeBlock(screenWidth / 2.0f - 16.0f, screenHeight - 74.0f, 64.0f, 64.0f, BLUE, 1.0f, true);
-    Block platform3 = initializeBlock(screenWidth / 2.0f + 128.0f, screenHeight - 74.0f, 64.0f, 64.0f, BLUE, 1.0f, true);
-    blocks[0] = floor;
-    blocks[1] = platform1;
-    blocks[2] = platform2;
-    blocks[3] = platform3;
+    ConvexPolygon square = PolygonInitializeRectangle(400.0f, 25.0f, 64.0f, 64.0f, BLUE);
+    ConvexPolygon triangle = PolygonInitializeTriangle((Vector2) { 100.0f, 250.0f }, (Vector2) { 220.0f, 250.0f }, (Vector2) { 160.0f, 370.0f }, BLUE);
+
+    convexPolygons[0] = square;
+    convexPolygons[1] = triangle;
+
+    ConvexPolygon polygons[] =
+    {
+        PolygonInitializeRectangle(0, 0, 100, 100, BLUE),
+        PolygonInitializeRectangle(100, 100, 100, 100, BLUE),
+        PolygonInitializeRectangle(0, 200, 100, 100, BLUE),
+        PolygonInitializeRectangle(-100, 100, 100, 100, BLUE),
+        PolygonInitializeRectangle(0, 100, 100, 100, BLUE),
+    };
+
+    ConcavePolygon plus2 = PolygonInitializeConcave(polygons, 5, BLUE);
+    concavePolygons[0] = plus2;
 }
 
-void drawDebugInfo()
+void DrawDebugInfo()
 {
     DrawFPS(0, 0);
     DrawText(TextFormat("coordinates.x: %f", player.position.coordinates.x), 0, 40, 20, WHITE);
     DrawText(TextFormat("coordinates.y: %f", player.position.coordinates.y), 0, 60, 20, WHITE);
-
-    DrawText(TextFormat("velocity.x: %f", player.physics.velocity.x), 0, 80, 20, WHITE);
-    DrawText(TextFormat("velocity.y: %f", player.physics.velocity.y), 0, 100, 20, WHITE);
-
-    DrawText(TextFormat("direction.x: %f", player.position.direction.x), 0, 140, 20, WHITE);
-    DrawText(TextFormat("direction.y: %f", player.position.direction.y), 0, 160, 20, WHITE);
 }
 
